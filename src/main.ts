@@ -1,14 +1,19 @@
 import express, { Request, Response } from 'express';
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
-
+import { config } from 'dotenv';
 import { logger } from 'hono/logger'
 import { twiml } from 'twilio'
 import OpenAI from 'openai';
 import { getCookie, setCookie } from 'hono/cookie'
 
+// Load environment variables
+config();
+
 const app = new Hono();
-const openai = new OpenAI();
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 const INITIAL_MESSAGE = "Hello! How are you?"
 
