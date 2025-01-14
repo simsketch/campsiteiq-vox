@@ -11,6 +11,14 @@ import { getCookie, setCookie } from 'hono/cookie'
 config();
 
 const app = new Hono();
+console.log('Creating Hono app and registering routes...');
+
+// Add logging middleware to see incoming requests
+app.use('*', async (c, next) => {
+  console.log(`${c.req.method} ${c.req.url}`);
+  await next();
+});
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
@@ -96,10 +104,12 @@ app.post('/api/respond', async (c) => {
   console.log(`Server listening on port ${port}`);
 }); */
 const port = 3000;
-serve({
+const server = serve({
   fetch: app.fetch,
   port
-})
+});
+
+console.log(`Server is running on http://localhost:${port}`);
 
 /*
 function addEvent() {
