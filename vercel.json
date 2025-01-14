@@ -1,5 +1,9 @@
 {
   "version": 2,
+  "scripts": {
+      "start": "vercel dev",
+      "deploy": "vercel"
+  },
   "builds": [
     {
       "src": "dist/main.js",
