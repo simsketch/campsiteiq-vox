@@ -1,24 +1,10 @@
-import express, { Request, Response } from 'express';
-import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
-import { config } from 'dotenv';
-import { logger } from 'hono/logger'
 import { twiml } from 'twilio'
 import OpenAI from 'openai';
 import { getCookie, setCookie } from 'hono/cookie'
-
-// Load environment variables
-config();
+import type { IncomingMessage, ServerResponse } from 'http'
 
 const app = new Hono();
-console.log('Creating Hono app and registering routes...');
-
-// Add logging middleware to see incoming requests
-app.use('*', async (c, next) => {
-  console.log(`${c.req.method} ${c.req.url}`);
-  await next();
-});
-
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
@@ -61,7 +47,6 @@ app.post('/api/incoming-call', (c) => {
       { role: "assistant", content: INITIAL_MESSAGE }
     ]))
   }
-  console.log("call came in");
   voiceResponse.gather({
     input: ["speech"],
     speechTimeout: "auto",
@@ -74,7 +59,6 @@ app.post('/api/incoming-call', (c) => {
 });
 
 app.post('/api/respond', async (c) => {
-  console.log("response came in");
   const formData = await c.req.formData()
   const voiceInput = formData.get("SpeechResult")?.toString()!
 
@@ -89,7 +73,6 @@ app.post('/api/respond', async (c) => {
 
   const assistantResponse = chatCompletion.choices[0].message.content;
   messages.push({ role: "assistant", content: assistantResponse });
-  console.log(messages)
   
   setCookie(c, "messages", JSON.stringify(messages))
 
@@ -99,39 +82,39 @@ app.post('/api/respond', async (c) => {
   c.header("Content-Type", "application/xml")
   return c.body(voiceResponse.toString());
 });
-// Start the server
-/* app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
-}); */
-const port = 3000;
-const server = serve({
-  fetch: app.fetch,
-  port
-});
 
-console.log(`Server is running on http://localhost:${port}`);
+// Simple health check endpoint
+app.get('/', (c) => c.text('Healthy'));
 
-/*
-function addEvent() {
-  // Explanation of how the search section works (as it is NOT quite like most things Google) as part of the getEvents function:
-  //    {search: 'word1'}              Search for events with word1
-  //    {search: '-word1'}             Search for events without word1
-  //    {search: 'word1 word2'}        Search for events with word2 ONLY
-  //    {search: 'word1-word2'}        Search for events with ????
-  //    {search: 'word1 -word2'}       Search for events without word2
-  //    {search: 'word1+word2'}        Search for events with word1 AND word2
-  //    {search: 'word1+-word2'}       Search for events with word1 AND without word2
-  //    {search: '-word1+-word2'}      Search for events without word1 AND without word2 (I find this to work logically like an 'OR' statement)
-  try {
-    let calendar = CalendarApp.getDefaultCalendar();
-    let events = calendar.getEvents( new Date('August 20, 2022 00:00:00 GMT-7'), new Date('August 20, 2022 23:59:59 GMT-7'), { search: 'Alabama'} );
-    if( events.length === 0 ) {
-      calendar.createEvent('Alabama', new Date('August 20, 2022 00:00:00 GMT-7'), new Date('August 20, 2022 23:59:59 GMT-7'));
-      console.log("created");
-    }
+// Export the handler function for Vercel
+export default async function handler(req: IncomingMessage, res: ServerResponse) {
+  const chunks: Buffer[] = [];
+  
+  for await (const chunk of req) {
+    chunks.push(Buffer.from(chunk));
   }
-  catch(err) {
-    console.log(err);
+  const body = Buffer.concat(chunks).toString();
+
+  const url = new URL(req.url || '/', `http://${req.headers.host}`);
+  const request = new Request(url, {
+    method: req.method,
+    headers: new Headers(req.headers as Record<string, string>),
+    body: body.length > 0 ? body : undefined
+  });
+
+  try {
+    const response = await app.fetch(request);
+    res.statusCode = response.status;
+    
+    for (const [key, value] of response.headers.entries()) {
+      res.setHeader(key, value);
+    }
+    
+    const responseBody = await response.text();
+    res.end(responseBody);
+  } catch (error) {
+    console.error('Handler error:', error);
+    res.statusCode = 500;
+    res.end('Internal Server Error');
   }
 }
-*/
